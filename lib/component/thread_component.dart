@@ -34,11 +34,8 @@ class _ThreadComponentState extends State<ThreadComponent> {
     }
     String url = widget.thread.titleUrl;
     if (pageNum != null) {
-      RegExp reg = new RegExp(r"(\d)+\-(\d)+\-(\d)");
-      String next = url.replaceAllMapped(reg, (match) {
-        return '${match.group(0)}-${pageNum}-${match.group(2)}';
-      });
-      print(next);
+      List<String> a = url.split('-');
+      url = a[0] + '-' + a[1] + '-' + pageNum.toString() + '-' + a[3];
     }
     String str = await BaseUtil.httpGet(
         'http://sexinsex.net/bbs/' + url);
@@ -70,7 +67,7 @@ class _ThreadComponentState extends State<ThreadComponent> {
         }
       }
     }
-    List<DOM.Element> threads = document.querySelectorAll('div[id^=postmessage_]');
+    List<DOM.Element> threads = document.querySelectorAll('div[id^=postmessage_].t_msgfont');
     for (DOM.Element thread in threads) {
       String id = thread.attributes['id'].replaceFirst('postmessage_', '');
       List<MessageContent> messages = thread.children.map((child) {
@@ -93,8 +90,6 @@ class _ThreadComponentState extends State<ThreadComponent> {
       itemCount: contents.length + 1,
       itemBuilder: (BuildContext context, int index) {
         if (index >= contents.length) {
-          print(pageNum);
-          print(pageSize);
           if (pageNum < pageSize) {
             pageNum++;
             _loadList(pageNum: pageNum);

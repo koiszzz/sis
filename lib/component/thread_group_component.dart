@@ -96,8 +96,6 @@ class _ThreadGroupComponentState extends State<ThreadGroupComponent> {
       itemCount: threads.length + 1,
       itemBuilder: (BuildContext context, int index) {
         if (index >= threads.length) {
-          print(pageNum);
-          print(pageSize);
           if (pageNum < pageSize) {
             pageNum++;
             _loadList(pageNum: pageNum);

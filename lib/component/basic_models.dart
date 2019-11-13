@@ -48,7 +48,19 @@ class Thread {
 class ThreadContent {
   List<MessageContent> messages;
   String id;
-  ThreadContent({this.messages, this.id});
+  Author author;
+  ThreadContent({this.messages, this.id, this.author});
+}
+
+class Author {
+  String uid;
+  String name;
+  String postCount;
+  String postEssence;
+  String fraction;
+  String coin;
+  String level;
+  Author({this.uid});
 }
 
 class MessageContent {

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:sis/component/basic_models.dart';
@@ -34,14 +36,19 @@ class _ThreadComponentState extends State<ThreadComponent> {
     }
     String url = widget.thread.titleUrl;
     if (pageNum != null) {
-      RegExp reg = new RegExp(r"(\d)+\-(\d)+\-(\d)");
-      String next = url.replaceAllMapped(reg, (match) {
-        return '${match.group(0)}-${pageNum}-${match.group(2)}';
-      });
-      print(next);
+      RegExp reg = new RegExp(r"(thread-\d+-)(\d+)(-\d+.html)");
+      Match m = reg.firstMatch(url);
+      if (m != null) {
+        if (m.group(3) == null) {
+          print('帖子链接不符合规则');
+        } else {
+          url = m.group(1) + pageNum.toString() + m.group(3);
+        }
+      } else {
+        print('没有匹配');
+      }
     }
-    String str = await BaseUtil.httpGet(
-        'http://sexinsex.net/bbs/' + url);
+    String str = await BaseUtil.httpGet('http://sexinsex.net/bbs/' + url);
     if (str == null) {
       setState(() {
         _loadState = LoadingState.Failure;
@@ -61,8 +68,9 @@ class _ThreadComponentState extends State<ThreadComponent> {
     }
     if (pageSize == null) {
       if (document.querySelector('a.last') != null) {
-        pageSize = int.parse(document.querySelector('a.last').text.replaceAll('... ', ''));
-      } else{
+        pageSize = int.parse(
+            document.querySelector('a.last').text.replaceAll('... ', ''));
+      } else {
         if (document.querySelectorAll('.pages a') == null) {
           pageSize = 1;
         } else {
@@ -70,22 +78,85 @@ class _ThreadComponentState extends State<ThreadComponent> {
         }
       }
     }
-    List<DOM.Element> threads = document.querySelectorAll('div[id^=postmessage_]');
+    List<DOM.Element> threads = document.querySelectorAll('table[id^=pid]');
     for (DOM.Element thread in threads) {
-      String id = thread.attributes['id'].replaceFirst('postmessage_', '');
-      List<MessageContent> messages = thread.children.map((child) {
-        ContentType type = child.localName == 'img' ? ContentType.Img : ContentType.Text;
-        String content = child.localName == 'img' ? child.attributes['img'] : child.text;
-        if (content == null) {
-          content = child.innerHtml;
+      DOM.Element authorEle = thread.querySelector('.postauthor');
+      Author author;
+      if (authorEle.querySelector('cite a') != null) {
+        author = Author(
+            uid: authorEle
+                .querySelector('cite a')
+                .attributes['href']
+                .replaceAll('space.php?uid=', ''));
+      }
+      String id = thread.attributes['id'].replaceFirst('pid', '');
+      List<DOM.Element> contentEles =
+          thread.querySelectorAll('div[id^=postmessage_]');
+      if (contentEles.length <= 0) {
+        continue;
+      }
+      print('内容个数:${contentEles.length}');
+      List<MessageContent> messages = new List();
+      List<DOM.Element> fontElement =
+          contentEles[contentEles.length - 1].querySelectorAll('font');
+      if (fontElement.length > 0) {
+        print('font 元素个数：${fontElement.length}');
+        for (DOM.Element font in fontElement) {
+          messages.addAll(_dealWithFontTag(font));
         }
-        return MessageContent(type: type, content: content);
-      }).toList();
-      this.contents.add(ThreadContent(id: id, messages: messages));
+      } else {
+        for (DOM.Node msgElement in contentEles[contentEles.length - 1].nodes) {
+          String t = msgElement.text.replaceAll('　', '').trim();
+          if (t.length <= 0) {
+            continue;
+          }
+          messages.add(
+              MessageContent(type: ContentType.Text, content: msgElement.text));
+        }
+      }
+
+      this
+          .contents
+          .add(ThreadContent(id: id, messages: messages, author: author));
     }
     setState(() {
       _loadState = LoadingState.Success;
     });
+  }
+
+  List<MessageContent> _dealWithFontTag(DOM.Element font) {
+    if (font.querySelector('font') != null) {
+      print('子项有font');
+      return [];
+    }
+    if (font.querySelector('marquee') != null) {
+      print('子项有marquee');
+      return [MessageContent(type: ContentType.Text, content: font.text)];
+    }
+    if (font.querySelector('img') != null) {
+      print('子项有img');
+      List<MessageContent> list = [];
+      for (DOM.Node node in font.nodes) {
+        if (node.toString() == '<html img>') {
+          list.add(MessageContent(
+              type: ContentType.Img, content: node.attributes['src']));
+        } else {
+          String t = node.text.replaceAll('　', '').trim();
+          if (t.length > 0) {
+            list.add(MessageContent(type: ContentType.Text, content: t));
+          }
+        }
+      }
+      return list;
+    } else {
+      print('子项没有img');
+      RegExp t = new RegExp(r'[　]{2,}');
+      return [
+        MessageContent(
+            type: ContentType.Text,
+            content: font.text.replaceAll('\n', '').replaceAll(t, '\n　　'))
+      ];
+    }
   }
 
   Widget _buildSuccess() {
@@ -93,8 +164,6 @@ class _ThreadComponentState extends State<ThreadComponent> {
       itemCount: contents.length + 1,
       itemBuilder: (BuildContext context, int index) {
         if (index >= contents.length) {
-          print(pageNum);
-          print(pageSize);
           if (pageNum < pageSize) {
             pageNum++;
             _loadList(pageNum: pageNum);
@@ -108,7 +177,9 @@ class _ThreadComponentState extends State<ThreadComponent> {
         }
         return Card(
           child: Column(
-            children: contents[index].messages.map<Widget>((message) => Text(message.content)).toList(),
+            children: contents[index].messages.map<Widget>((message) {
+              return Text(message.content);
+            }).toList(),
           ),
         );
       },
@@ -118,13 +189,13 @@ class _ThreadComponentState extends State<ThreadComponent> {
   Widget _buildBody() {
     switch (_loadState) {
       case LoadingState.Failure:
-      // TODO: Handle this case.
+        // TODO: Handle this case.
         return _buildFailure();
       case LoadingState.Success:
-      // TODO: Handle this case.
+        // TODO: Handle this case.
         return _buildSuccess();
       case LoadingState.NotAuth:
-      // TODO: Handle this case.
+        // TODO: Handle this case.
         return _buildNotAuth();
         break;
       case LoadingState.Loading:

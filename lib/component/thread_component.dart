@@ -27,14 +27,14 @@ class _ThreadComponentState extends State<ThreadComponent> {
   }
 
   Future<void> _loadList({int pageNum}) async {
-    if (widget.thread.titleUrl == null || widget.thread.titleUrl.length <= 0) {
+    if (widget.thread.url == null || widget.thread.url.length <= 0) {
       setState(() {
         _loadState = LoadingState.Failure;
         messageToShow = '链接错误，请返回主页刷新页面';
       });
       return;
     }
-    String url = widget.thread.titleUrl;
+    String url = widget.thread.url;
     if (pageNum != null) {
       RegExp reg = new RegExp(r"(thread-\d+-)(\d+)(-\d+.html)");
       Match m = reg.firstMatch(url);
@@ -48,7 +48,10 @@ class _ThreadComponentState extends State<ThreadComponent> {
         print('没有匹配');
       }
     }
-    String str = await BaseUtil.httpGet('http://sexinsex.net/bbs/' + url);
+    if (url.indexOf('http://') < 0) {
+      url = 'http://sexinsex.net/bbs/' + url;
+    }
+    String str = await BaseUtil.httpGet(url);
     if (str == null) {
       setState(() {
         _loadState = LoadingState.Failure;
@@ -87,7 +90,7 @@ class _ThreadComponentState extends State<ThreadComponent> {
             uid: authorEle
                 .querySelector('cite a')
                 .attributes['href']
-                .replaceAll('space.php?uid=', ''));
+                .replaceAll('space.php?uid=', ''), name: authorEle.querySelector('cite a').text);
       }
       String id = thread.attributes['id'].replaceFirst('pid', '');
       List<DOM.Element> contentEles =
@@ -95,68 +98,21 @@ class _ThreadComponentState extends State<ThreadComponent> {
       if (contentEles.length <= 0) {
         continue;
       }
-      print('内容个数:${contentEles.length}');
-      List<MessageContent> messages = new List();
-      List<DOM.Element> fontElement =
-          contentEles[contentEles.length - 1].querySelectorAll('font');
-      if (fontElement.length > 0) {
-        print('font 元素个数：${fontElement.length}');
-        for (DOM.Element font in fontElement) {
-          messages.addAll(_dealWithFontTag(font));
-        }
-      } else {
-        for (DOM.Node msgElement in contentEles[contentEles.length - 1].nodes) {
-          String t = msgElement.text.replaceAll('　', '').trim();
-          if (t.length <= 0) {
-            continue;
-          }
-          messages.add(
-              MessageContent(type: ContentType.Text, content: msgElement.text));
-        }
-      }
-
+      RegExp exp = new RegExp(r'([\u4e00-\u9fa5\u3002\uff1b\uff0c\uff1a\u201c\u201d\uff08\uff09\u3001\uff1f\u300a\u300b]{1})\n([\u4e00-\u9fa5]{1})');
+      String message = contentEles[contentEles.length - 1]
+          .text
+          .replaceAll(new RegExp(r' '), '')
+          .replaceAll(new RegExp(r'[　]{6,}'), '　　　　')
+          .replaceAllMapped(exp, (match) {
+        return match.group(1) + match.group(2);
+      });
       this
           .contents
-          .add(ThreadContent(id: id, messages: messages, author: author));
+          .add(ThreadContent(id: id, message: message, author: author));
     }
     setState(() {
       _loadState = LoadingState.Success;
     });
-  }
-
-  List<MessageContent> _dealWithFontTag(DOM.Element font) {
-    if (font.querySelector('font') != null) {
-      print('子项有font');
-      return [];
-    }
-    if (font.querySelector('marquee') != null) {
-      print('子项有marquee');
-      return [MessageContent(type: ContentType.Text, content: font.text)];
-    }
-    if (font.querySelector('img') != null) {
-      print('子项有img');
-      List<MessageContent> list = [];
-      for (DOM.Node node in font.nodes) {
-        if (node.toString() == '<html img>') {
-          list.add(MessageContent(
-              type: ContentType.Img, content: node.attributes['src']));
-        } else {
-          String t = node.text.replaceAll('　', '').trim();
-          if (t.length > 0) {
-            list.add(MessageContent(type: ContentType.Text, content: t));
-          }
-        }
-      }
-      return list;
-    } else {
-      print('子项没有img');
-      RegExp t = new RegExp(r'[　]{2,}');
-      return [
-        MessageContent(
-            type: ContentType.Text,
-            content: font.text.replaceAll('\n', '').replaceAll(t, '\n　　'))
-      ];
-    }
   }
 
   Widget _buildSuccess() {
@@ -168,7 +124,11 @@ class _ThreadComponentState extends State<ThreadComponent> {
             pageNum++;
             _loadList(pageNum: pageNum);
             return Center(
-              child: CircularProgressIndicator(),
+              child: SizedBox(
+                height: 25,
+                width: 25,
+                child: CircularProgressIndicator(),
+              ),
             );
           }
           return Center(
@@ -176,13 +136,49 @@ class _ThreadComponentState extends State<ThreadComponent> {
           );
         }
         return Card(
-          child: Column(
-            children: contents[index].messages.map<Widget>((message) {
-              return Text(message.content);
-            }).toList(),
-          ),
-        );
+            elevation: 5.0,
+            margin: EdgeInsets.all(5.0),
+            child: Container(
+              padding: EdgeInsets.all(15.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  _buildRowAuthor(contents[index].author),
+                  RichText(
+                    text: TextSpan(
+                      children: contents[index].message.split('\n\n').map((row) {
+                        return TextSpan(text: row + '\n',style: Theme.of(context).textTheme.body1);
+                      }).toList()
+                    ),
+                  ),
+                ],
+              ),
+            ));
       },
+    );
+  }
+
+  Widget _buildRowAuthor(Author author) {
+    return Container(
+      padding: EdgeInsets.only(bottom: 15.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          CircleAvatar(
+            radius: 25,
+            child: Image.asset('images/p_icon.jpg', width: 39,),
+          ),
+          Container(
+            padding: EdgeInsets.only(left: 15.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                author == null ? Text('用户已被删除') : Text(author.name)
+              ],
+            ),
+          )
+        ],
+      ),
     );
   }
 

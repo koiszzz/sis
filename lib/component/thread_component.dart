@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:sis/component/basic_models.dart';
@@ -25,20 +27,31 @@ class _ThreadComponentState extends State<ThreadComponent> {
   }
 
   Future<void> _loadList({int pageNum}) async {
-    if (widget.thread.titleUrl == null || widget.thread.titleUrl.length <= 0) {
+    if (widget.thread.url == null || widget.thread.url.length <= 0) {
       setState(() {
         _loadState = LoadingState.Failure;
         messageToShow = '链接错误，请返回主页刷新页面';
       });
       return;
     }
-    String url = widget.thread.titleUrl;
+    String url = widget.thread.url;
     if (pageNum != null) {
-      List<String> a = url.split('-');
-      url = a[0] + '-' + a[1] + '-' + pageNum.toString() + '-' + a[3];
+      RegExp reg = new RegExp(r"(thread-\d+-)(\d+)(-\d+.html)");
+      Match m = reg.firstMatch(url);
+      if (m != null) {
+        if (m.group(3) == null) {
+          print('帖子链接不符合规则');
+        } else {
+          url = m.group(1) + pageNum.toString() + m.group(3);
+        }
+      } else {
+        print('没有匹配');
+      }
     }
-    String str = await BaseUtil.httpGet(
-        'http://sexinsex.net/bbs/' + url);
+    if (url.indexOf('http://') < 0) {
+      url = 'http://sexinsex.net/bbs/' + url;
+    }
+    String str = await BaseUtil.httpGet(url);
     if (str == null) {
       setState(() {
         _loadState = LoadingState.Failure;
@@ -58,8 +71,9 @@ class _ThreadComponentState extends State<ThreadComponent> {
     }
     if (pageSize == null) {
       if (document.querySelector('a.last') != null) {
-        pageSize = int.parse(document.querySelector('a.last').text.replaceAll('... ', ''));
-      } else{
+        pageSize = int.parse(
+            document.querySelector('a.last').text.replaceAll('... ', ''));
+      } else {
         if (document.querySelectorAll('.pages a') == null) {
           pageSize = 1;
         } else {
@@ -67,18 +81,34 @@ class _ThreadComponentState extends State<ThreadComponent> {
         }
       }
     }
-    List<DOM.Element> threads = document.querySelectorAll('div[id^=postmessage_].t_msgfont');
+    List<DOM.Element> threads = document.querySelectorAll('table[id^=pid]');
     for (DOM.Element thread in threads) {
-      String id = thread.attributes['id'].replaceFirst('postmessage_', '');
-      List<MessageContent> messages = thread.children.map((child) {
-        ContentType type = child.localName == 'img' ? ContentType.Img : ContentType.Text;
-        String content = child.localName == 'img' ? child.attributes['img'] : child.text;
-        if (content == null) {
-          content = child.innerHtml;
-        }
-        return MessageContent(type: type, content: content);
-      }).toList();
-      this.contents.add(ThreadContent(id: id, messages: messages));
+      DOM.Element authorEle = thread.querySelector('.postauthor');
+      Author author;
+      if (authorEle.querySelector('cite a') != null) {
+        author = Author(
+            uid: authorEle
+                .querySelector('cite a')
+                .attributes['href']
+                .replaceAll('space.php?uid=', ''), name: authorEle.querySelector('cite a').text);
+      }
+      String id = thread.attributes['id'].replaceFirst('pid', '');
+      List<DOM.Element> contentEles =
+          thread.querySelectorAll('div[id^=postmessage_]');
+      if (contentEles.length <= 0) {
+        continue;
+      }
+      RegExp exp = new RegExp(r'([\u4e00-\u9fa5\u3002\uff1b\uff0c\uff1a\u201c\u201d\uff08\uff09\u3001\uff1f\u300a\u300b]{1})\n([\u4e00-\u9fa5]{1})');
+      String message = contentEles[contentEles.length - 1]
+          .text
+          .replaceAll(new RegExp(r' '), '')
+          .replaceAll(new RegExp(r'[　]{6,}'), '　　　　')
+          .replaceAllMapped(exp, (match) {
+        return match.group(1) + match.group(2);
+      });
+      this
+          .contents
+          .add(ThreadContent(id: id, message: message, author: author));
     }
     setState(() {
       _loadState = LoadingState.Success;
@@ -94,7 +124,11 @@ class _ThreadComponentState extends State<ThreadComponent> {
             pageNum++;
             _loadList(pageNum: pageNum);
             return Center(
-              child: CircularProgressIndicator(),
+              child: SizedBox(
+                height: 25,
+                width: 25,
+                child: CircularProgressIndicator(),
+              ),
             );
           }
           return Center(
@@ -102,24 +136,62 @@ class _ThreadComponentState extends State<ThreadComponent> {
           );
         }
         return Card(
-          child: Column(
-            children: contents[index].messages.map<Widget>((message) => Text(message.content)).toList(),
-          ),
-        );
+            elevation: 5.0,
+            margin: EdgeInsets.all(5.0),
+            child: Container(
+              padding: EdgeInsets.all(15.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  _buildRowAuthor(contents[index].author),
+                  RichText(
+                    text: TextSpan(
+                      children: contents[index].message.split('\n\n').map((row) {
+                        return TextSpan(text: row + '\n',style: Theme.of(context).textTheme.body1);
+                      }).toList()
+                    ),
+                  ),
+                ],
+              ),
+            ));
       },
+    );
+  }
+
+  Widget _buildRowAuthor(Author author) {
+    return Container(
+      padding: EdgeInsets.only(bottom: 15.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          CircleAvatar(
+            radius: 25,
+            child: Image.asset('images/p_icon.jpg', width: 39,),
+          ),
+          Container(
+            padding: EdgeInsets.only(left: 15.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                author == null ? Text('用户已被删除') : Text(author.name)
+              ],
+            ),
+          )
+        ],
+      ),
     );
   }
 
   Widget _buildBody() {
     switch (_loadState) {
       case LoadingState.Failure:
-      // TODO: Handle this case.
+        // TODO: Handle this case.
         return _buildFailure();
       case LoadingState.Success:
-      // TODO: Handle this case.
+        // TODO: Handle this case.
         return _buildSuccess();
       case LoadingState.NotAuth:
-      // TODO: Handle this case.
+        // TODO: Handle this case.
         return _buildNotAuth();
         break;
       case LoadingState.Loading:

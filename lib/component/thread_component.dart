@@ -100,7 +100,7 @@ class _ThreadComponentState extends State<ThreadComponent> {
         continue;
       }
       RegExp exp = new RegExp(
-          r'([\u4e00-\u9fa5\u3002\uff1b\uff0c\uff1a\u201c\u201d\uff08\uff09\u3001\uff1f\u300a\u300b]{1})\n([\u4e00-\u9fa5]{1})');
+          r'([\u4e00-\u9fa5\u3002\uff1b\uff0c\uff1a\u201c\u201d\uff08\uff09\u3001\uff1f\u300a\u300b]{1})\n([\u4e00-\u9fa5\u4e00-\u9fa5\u3002\uff1b\uff0c\uff1a\u201c\u201d\uff08\uff09\u3001\uff1f\u300a\u300b]{1})');
       String message = contentEles[contentEles.length - 1]
           .innerHtml
           .replaceAllMapped(new RegExp(r'(<[^>]+>)'), (match) {

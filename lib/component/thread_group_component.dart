@@ -35,14 +35,15 @@ class _ThreadGroupComponentState extends State<ThreadGroupComponent> {
     }
     String url = widget.group.titleUrl;
     if (pageNum != null) {
-       if (url.contains('?')) {
-         url += 'page=' + pageNum.toString();
-       } else {
-         url = url.substring(0, url.lastIndexOf('-') + 1) + pageNum.toString() + url.substring(url.lastIndexOf('.'), url.length);
-       }
+      if (url.contains('?')) {
+        url += 'page=' + pageNum.toString();
+      } else {
+        url = url.substring(0, url.lastIndexOf('-') + 1) +
+            pageNum.toString() +
+            url.substring(url.lastIndexOf('.'), url.length);
+      }
     }
-    String str = await BaseUtil.httpGet(
-        'http://sexinsex.net/bbs/' + url);
+    String str = await BaseUtil.httpGet('http://sexinsex.net/bbs/' + url);
     if (str == null) {
       setState(() {
         _loadState = LoadingState.Failure;
@@ -62,12 +63,18 @@ class _ThreadGroupComponentState extends State<ThreadGroupComponent> {
     }
     if (pageSize == null) {
       if (document.querySelector('a.last') != null) {
-        pageSize = int.parse(document.querySelector('a.last').text.replaceAll('... ', ''));
-      } else{
+        pageSize = int.parse(
+            document
+                .querySelector('a.last')
+                .text
+                .replaceAll('... ', ''));
+      } else {
         if (document.querySelectorAll('.pages a') == null) {
           pageSize = 1;
         } else {
-          pageSize = document.querySelectorAll('.pages a').length ~/ 2 - 1;
+          pageSize = document
+              .querySelectorAll('.pages a')
+              .length ~/ 2 - 1;
         }
       }
     }
@@ -78,13 +85,20 @@ class _ThreadGroupComponentState extends State<ThreadGroupComponent> {
       }
       var title, url;
       if (thread.querySelector('span') != null) {
-        title = thread.querySelector('span').text.trim();
-        url = thread.querySelector('span a').attributes['href'];
+        title = thread
+            .querySelector('span')
+            .text
+            .trim();
+        url = thread
+            .querySelector('span a')
+            .attributes['href'];
       } else {
         title = thread.text.trim();
-        url = thread.querySelector('a').attributes['href'];
+        url = thread
+            .querySelector('a')
+            .attributes['href'];
       }
-      this.threads.add(Thread(title, url));
+      this.threads.add(Thread(title: title, url: url));
     }
     setState(() {
       _loadState = LoadingState.Success;
@@ -92,12 +106,10 @@ class _ThreadGroupComponentState extends State<ThreadGroupComponent> {
   }
 
   Widget _buildSuccess() {
-    return ListView.builder(
+    return ListView.separated(
       itemCount: threads.length + 1,
       itemBuilder: (BuildContext context, int index) {
         if (index >= threads.length) {
-          print(pageNum);
-          print(pageSize);
           if (pageNum < pageSize) {
             pageNum++;
             _loadList(pageNum: pageNum);
@@ -110,11 +122,15 @@ class _ThreadGroupComponentState extends State<ThreadGroupComponent> {
           );
         }
         return ListTile(
-          title: Text(threads[index].title),
+          title: Text(threads[index].title, style: Theme.of(context).textTheme.subtitle,),
           onTap: () {
-            Navigator.of(context).pushNamed('thread', arguments: threads[index]);
+            Navigator.of(context)
+                .pushNamed('thread', arguments: threads[index]);
           },
         );
+      },
+      separatorBuilder: (BuildContext context, index) {
+        return Divider(color: Theme.of(context).dividerTheme.color,);
       },
     );
   }
@@ -122,13 +138,13 @@ class _ThreadGroupComponentState extends State<ThreadGroupComponent> {
   Widget _buildBody() {
     switch (_loadState) {
       case LoadingState.Failure:
-        // TODO: Handle this case.
+      // TODO: Handle this case.
         return _buildFailure();
       case LoadingState.Success:
-        // TODO: Handle this case.
+      // TODO: Handle this case.
         return _buildSuccess();
       case LoadingState.NotAuth:
-        // TODO: Handle this case.
+      // TODO: Handle this case.
         return _buildNotAuth();
         break;
       case LoadingState.Loading:

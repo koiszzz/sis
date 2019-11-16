@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:sis/util/baseUtil.dart';
 import 'package:html/dom.dart' as DOM;
+import 'package:sis/component/search_component.dart';
+import 'package:sis/util/baseUtil.dart';
+
 import 'basic_models.dart';
 
 class IndexComponent extends StatefulWidget {
@@ -12,20 +14,16 @@ class IndexComponent extends StatefulWidget {
 }
 
 class _IndexComponentState extends State<IndexComponent> {
-  bool _loadingFlag = true;
+  SearchBarDelegate _delegate;
+  var _loadState = LoadingState.Loading;
+  String messageToShow = '';
   List<TopicSection> sections = new List();
 
   @override
   initState() {
     super.initState();
     _getTopics();
-  }
-
-  // 加载页面
-  Widget _loading() {
-    return Center(
-      child: CircularProgressIndicator(),
-    );
+    _delegate = SearchBarDelegate();
   }
 
   Widget _buildGroup(TopicGroup group) {
@@ -33,9 +31,7 @@ class _IndexComponentState extends State<IndexComponent> {
         Theme.of(context).textTheme.body1.copyWith(fontWeight: FontWeight.bold);
     return ListTile(
       title: Text(group.title, style: routeTitleTextStyle),
-      onTap: () => {
-        Navigator.of(context).pushNamed('group', arguments: group)
-      },
+      onTap: () => {Navigator.of(context).pushNamed('group', arguments: group)},
     );
   }
 
@@ -45,7 +41,10 @@ class _IndexComponentState extends State<IndexComponent> {
         leading: Icon(Icons.bookmark),
         title: Text(
           section.title,
-          style: Theme.of(context).textTheme.title,
+          style: Theme.of(context)
+              .textTheme
+              .subhead
+              .copyWith(fontWeight: FontWeight.bold),
         ),
         children: section.groups.map(_buildGroup).toList(),
       ),
@@ -53,16 +52,10 @@ class _IndexComponentState extends State<IndexComponent> {
   }
 
   // 话题列表
-  Widget _buildList() {
-    if (sections == null || sections.length <= 0) {
-      return Center(
-        child: Text('加载失败'),
-      );
-    } else {
-      return ListView(
-        children: sections.map(_buildSection).toList(),
-      );
-    }
+  Widget _buildSuccess() {
+    return ListView(
+      children: sections.map(_buildSection).toList(),
+    );
   }
 
   @override
@@ -70,10 +63,21 @@ class _IndexComponentState extends State<IndexComponent> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
+        actions: <Widget>[
+          IconButton(
+            tooltip: 'search',
+            icon: Icon(Icons.search),
+            onPressed: () async {
+              await showSearch<String>(
+                context: context,
+                delegate: _delegate,
+              );
+            },
+          )
+        ],
       ),
-      body: _loadingFlag
-          ? _loading()
-          : _buildList(), // This trailing comma makes auto-formatting nicer for build methods.
+      body:
+          _buildBody(), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 
@@ -81,14 +85,18 @@ class _IndexComponentState extends State<IndexComponent> {
     String str = await BaseUtil.httpGet('http://sexinsex.net/bbs/index.php');
     if (str == null) {
       setState(() {
-        _loadingFlag = false;
+        _loadState = LoadingState.Failure;
+        messageToShow = '加载失败';
       });
       return;
     }
     DOM.Document document = BaseUtil.parseHtml(str);
     List<DOM.Element> blocks = document.getElementsByClassName('forumlist');
     if (blocks == null || blocks.length <= 0) {
-      print('没有找到分区内容');
+      setState(() {
+        _loadState = LoadingState.Failure;
+        messageToShow = '文档结构变化，无法找到分组情况';
+      });
     }
     for (DOM.Element element in blocks) {
       DOM.Element titleP = element.getElementsByTagName('h3').first;
@@ -109,7 +117,37 @@ class _IndexComponentState extends State<IndexComponent> {
       sections.add(section);
     }
     setState(() {
-      _loadingFlag = false;
+      _loadState = LoadingState.Success;
     });
+  }
+
+  Widget _buildBody() {
+    switch (_loadState) {
+      case LoadingState.Failure:
+        // TODO: Handle this case.
+        return _buildFailure();
+      case LoadingState.Success:
+        // TODO: Handle this case.
+        return _buildSuccess();
+      case LoadingState.Loading:
+      default:
+        return Center(
+          child: CircularProgressIndicator(),
+        );
+    }
+  }
+
+  Widget _buildFailure() {
+    return Center(
+      child: Column(
+        children: <Widget>[
+          Text(messageToShow),
+          FlatButton(
+            child: Text('重新加载'),
+            onPressed: _getTopics,
+          )
+        ],
+      ),
+    );
   }
 }

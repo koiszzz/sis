@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 
 class TopicSection {
   String title;
@@ -38,29 +39,30 @@ class TopicGroup {
 
 class Thread {
   String title;
-  String titleUrl;
-  Thread(String title, String url) {
-    this.title = title;
-    this.titleUrl = url;
-  }
+  String url;
+  String content;
+
+  Thread({@required this.url, @required this.title, this.content});
 }
 
 class ThreadContent {
-  List<MessageContent> messages;
+  String message;
   String id;
-  ThreadContent({this.messages, this.id});
+  Author author;
+
+  ThreadContent({this.message, this.id, this.author});
 }
 
-class MessageContent {
-  MessageContent({this.type, this.content});
-  ContentType type;
-  String content;
+class Author {
+  String uid;
+  String name;
+  String postCount;
+  String postEssence;
+  String fraction;
+  String coin;
+  String level;
+
+  Author({this.uid, this.name});
 }
 
-enum ContentType {
-  Text, Img
-}
-
-enum LoadingState {
-  Loading, Failure, Success, NotAuth
-}
+enum LoadingState { Loading, Failure, Success, NotAuth }

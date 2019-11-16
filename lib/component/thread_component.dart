@@ -90,7 +90,8 @@ class _ThreadComponentState extends State<ThreadComponent> {
             uid: authorEle
                 .querySelector('cite a')
                 .attributes['href']
-                .replaceAll('space.php?uid=', ''), name: authorEle.querySelector('cite a').text);
+                .replaceAll('space.php?uid=', ''),
+            name: authorEle.querySelector('cite a').text);
       }
       String id = thread.attributes['id'].replaceFirst('pid', '');
       List<DOM.Element> contentEles =
@@ -98,14 +99,20 @@ class _ThreadComponentState extends State<ThreadComponent> {
       if (contentEles.length <= 0) {
         continue;
       }
-      RegExp exp = new RegExp(r'([\u4e00-\u9fa5\u3002\uff1b\uff0c\uff1a\u201c\u201d\uff08\uff09\u3001\uff1f\u300a\u300b]{1})\n([\u4e00-\u9fa5]{1})');
+      RegExp exp = new RegExp(
+          r'([\u4e00-\u9fa5\u3002\uff1b\uff0c\uff1a\u201c\u201d\uff08\uff09\u3001\uff1f\u300a\u300b]{1})\n([\u4e00-\u9fa5]{1})');
       String message = contentEles[contentEles.length - 1]
-          .text
-          .replaceAll(new RegExp(r' '), '')
+          .innerHtml
+          .replaceAllMapped(new RegExp(r'(<[^>]+>)'), (match) {
+            if (match.group(1).contains('img')) {
+              return match.group(1);
+            }
+            return '';
+          })
           .replaceAll(new RegExp(r'[　]{6,}'), '　　　　')
           .replaceAllMapped(exp, (match) {
-        return match.group(1) + match.group(2);
-      });
+            return match.group(1) + match.group(2);
+          });
       this
           .contents
           .add(ThreadContent(id: id, message: message, author: author));
@@ -146,10 +153,12 @@ class _ThreadComponentState extends State<ThreadComponent> {
                   _buildRowAuthor(contents[index].author),
                   RichText(
                     text: TextSpan(
-                      children: contents[index].message.split('\n\n').map((row) {
-                        return TextSpan(text: row + '\n',style: Theme.of(context).textTheme.body1);
-                      }).toList()
-                    ),
+                        children:
+                            contents[index].message.split('\n\n').map((row) {
+                      return TextSpan(
+                          text: row + '\n',
+                          style: Theme.of(context).textTheme.body1);
+                    }).toList()),
                   ),
                 ],
               ),
@@ -166,7 +175,10 @@ class _ThreadComponentState extends State<ThreadComponent> {
         children: <Widget>[
           CircleAvatar(
             radius: 25,
-            child: Image.asset('images/p_icon.jpg', width: 39,),
+            child: Image.asset(
+              'images/p_icon.jpg',
+              width: 39,
+            ),
           ),
           Container(
             padding: EdgeInsets.only(left: 15.0),

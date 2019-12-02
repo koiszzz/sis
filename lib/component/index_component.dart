@@ -14,7 +14,6 @@ class IndexComponent extends StatefulWidget {
 }
 
 class _IndexComponentState extends State<IndexComponent> {
-  SearchBarDelegate _delegate;
   var _loadState = LoadingState.Loading;
   String messageToShow = '';
   List<TopicSection> sections = new List();
@@ -23,7 +22,6 @@ class _IndexComponentState extends State<IndexComponent> {
   initState() {
     super.initState();
     _getTopics();
-    _delegate = SearchBarDelegate();
   }
 
   Widget _buildGroup(TopicGroup group) {
@@ -67,12 +65,7 @@ class _IndexComponentState extends State<IndexComponent> {
           IconButton(
             tooltip: 'search',
             icon: Icon(Icons.search),
-            onPressed: () async {
-              await showSearch<String>(
-                context: context,
-                delegate: _delegate,
-              );
-            },
+            onPressed: () => {Navigator.of(context).pushNamed('search')},
           )
         ],
       ),

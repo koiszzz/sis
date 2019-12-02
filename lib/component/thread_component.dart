@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:sis/component/basic_models.dart';
@@ -23,6 +24,10 @@ class _ThreadComponentState extends State<ThreadComponent> {
 
   initState() {
     super.initState();
+    Match match = RegExp(r'thread-[\d]+-([\d]+)-[\d]+.html').firstMatch(widget.thread.url);
+    if (match != null) {
+      pageNum = int.parse(match.group(1));
+    }
     _loadList();
   }
 
@@ -86,12 +91,24 @@ class _ThreadComponentState extends State<ThreadComponent> {
       DOM.Element authorEle = thread.querySelector('.postauthor');
       Author author;
       if (authorEle.querySelector('cite a') != null) {
+        DOM.Element postInfo = thread.querySelector('.postinfo');
+        String threadIndex = '?楼', postTime = '时间';
+        List<String> postInfoStrs = postInfo.text
+            .replaceAll(RegExp('[大|小|中|只|看|该|作|者|\n]'), '')
+            .replaceAll(RegExp('[	]+'), '')
+            .split('发表于');
+        if (postInfoStrs.length == 2) {
+          threadIndex = postInfoStrs[0];
+          postTime = postInfoStrs[1];
+        }
         author = Author(
             uid: authorEle
                 .querySelector('cite a')
                 .attributes['href']
                 .replaceAll('space.php?uid=', ''),
-            name: authorEle.querySelector('cite a').text);
+            name: authorEle.querySelector('cite a').text,
+            threadIndex: threadIndex,
+            postTime: postTime);
       }
       String id = thread.attributes['id'].replaceFirst('pid', '');
       List<DOM.Element> contentEles =
@@ -105,10 +122,11 @@ class _ThreadComponentState extends State<ThreadComponent> {
           .innerHtml
           .replaceAllMapped(new RegExp(r'(<[^>]+>)'), (match) {
             if (match.group(1).contains('img')) {
-              return match.group(1);
+              return '\n' + match.group(1);
             }
             return '';
           })
+          .replaceAll('&nbsp;', '　')
           .replaceAll(new RegExp(r'[　]{6,}'), '　　　　')
           .replaceAllMapped(exp, (match) {
             return match.group(1) + match.group(2);
@@ -151,20 +169,44 @@ class _ThreadComponentState extends State<ThreadComponent> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   _buildRowAuthor(contents[index].author),
-                  RichText(
-                    text: TextSpan(
-                        children:
-                            contents[index].message.split('\n\n').map((row) {
-                      return TextSpan(
-                          text: row + '\n',
-                          style: Theme.of(context).textTheme.body1);
-                    }).toList()),
-                  ),
+                  // ignore: sdk_version_ui_as_code
+                  ...contents[index]
+                      .message
+                      .split(RegExp(r'[\n]+'))
+                      .map(_buildContentRow)
+                      .toList()
                 ],
               ),
             ));
       },
     );
+  }
+
+  Widget _buildContentRow(String row) {
+    if (row.startsWith('<img')) {
+      Match match = RegExp(r'src="([^"]+)"').firstMatch(row);
+      if (match == null) {
+        return Text('错误的图片链接');
+      }
+      String imgUrl = match.group(1);
+      if (!imgUrl.startsWith('http')) {
+        imgUrl = 'http://sexinsex.net/bbs/' + imgUrl;
+      }
+      return CachedNetworkImage(
+        placeholder: (contents, url) => Column(
+          children: <Widget>[CircularProgressIndicator(), Text(url)],
+        ),
+        imageUrl: imgUrl,
+        errorWidget: (context, url, error) => Column(
+          children: <Widget>[
+            Icon(Icons.error),
+            Text('加载失败: ${error.toString()}'),
+            Text('链接:' + url, maxLines: 1, overflow: TextOverflow.ellipsis)
+          ],
+        ),
+      );
+    }
+    return Text(row + '\n');
   }
 
   Widget _buildRowAuthor(Author author) {
@@ -182,13 +224,18 @@ class _ThreadComponentState extends State<ThreadComponent> {
           ),
           Container(
             padding: EdgeInsets.only(left: 15.0),
+            width: 250,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: <Widget>[
-                author == null ? Text('用户已被删除') : Text(author.name)
+                author == null ? Text('用户已被删除') : Text(author.name),
+                Text(''),
+                author == null ? Text('没有获取提交时间') : Text(author.postTime)
               ],
             ),
-          )
+          ),
+          Text(author == null ? '?楼' : author.threadIndex)
         ],
       ),
     );

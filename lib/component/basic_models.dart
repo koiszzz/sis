@@ -61,8 +61,10 @@ class Author {
   String fraction;
   String coin;
   String level;
+  String postTime;
+  String threadIndex;
 
-  Author({this.uid, this.name});
+  Author({this.uid, this.name, this.threadIndex, this.postTime});
 }
 
 enum LoadingState { Loading, Failure, Success, NotAuth }

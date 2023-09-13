@@ -24,7 +24,8 @@ class _ThreadComponentState extends State<ThreadComponent> {
 
   initState() {
     super.initState();
-    Match match = RegExp(r'thread-[\d]+-([\d]+)-[\d]+.html').firstMatch(widget.thread.url);
+    Match match = RegExp(r'thread-[\d]+-([\d]+)-[\d]+.html')
+        .firstMatch(widget.thread.url);
     if (match != null) {
       pageNum = int.parse(match.group(1));
     }
@@ -141,43 +142,49 @@ class _ThreadComponentState extends State<ThreadComponent> {
   }
 
   Widget _buildSuccess() {
-    return ListView.builder(
-      itemCount: contents.length + 1,
-      itemBuilder: (BuildContext context, int index) {
-        if (index >= contents.length) {
-          if (pageNum < pageSize) {
-            pageNum++;
-            _loadList(pageNum: pageNum);
+    return RefreshIndicator(
+      child: ListView.builder(
+        itemCount: contents.length + 1,
+        itemBuilder: (BuildContext context, int index) {
+          if (index >= contents.length) {
+            if (pageNum < pageSize) {
+              pageNum++;
+              _loadList(pageNum: pageNum);
+              return Center(
+                child: SizedBox(
+                  height: 25,
+                  width: 25,
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
             return Center(
-              child: SizedBox(
-                height: 25,
-                width: 25,
-                child: CircularProgressIndicator(),
-              ),
+              child: Text('没有更多的内容了😜'),
             );
           }
-          return Center(
-            child: Text('没有更多的内容了😜'),
-          );
-        }
-        return Card(
-            elevation: 5.0,
-            margin: EdgeInsets.all(5.0),
-            child: Container(
-              padding: EdgeInsets.all(15.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  _buildRowAuthor(contents[index].author),
-                  // ignore: sdk_version_ui_as_code
-                  ...contents[index]
-                      .message
-                      .split(RegExp(r'[\n]+'))
-                      .map(_buildContentRow)
-                      .toList()
-                ],
-              ),
-            ));
+          return Card(
+              elevation: 5.0,
+              margin: EdgeInsets.all(5.0),
+              child: Container(
+                padding: EdgeInsets.all(15.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    _buildRowAuthor(contents[index].author),
+                    // ignore: sdk_version_ui_as_code
+                    ...contents[index]
+                        .message
+                        .split(RegExp(r'[\n]+'))
+                        .map(_buildContentRow)
+                        .toList()
+                  ],
+                ),
+              ));
+        },
+      ),
+      onRefresh: () async {
+        // todo: 改造下加载数据结构
+        print('load pre');
       },
     );
   }
@@ -297,6 +304,12 @@ class _ThreadComponentState extends State<ThreadComponent> {
         title: Text(widget.thread.title),
       ),
       body: _buildBody(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // todo: 重置加载页数为1
+        },
+        child: Icon(Icons.replay),
+      ),
     );
   }
 }

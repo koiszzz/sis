@@ -79,6 +79,11 @@ class _SearchComponentState extends State<SearchComponent> {
     await prefs.setStringList(_sharedKey, his);
   }
 
+  Future<void> _clearSearchHis() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_sharedKey);
+  }
+
   Future<void> _loadSearchResult({start: int}) async {
     if (_loadMore) {
       return;
@@ -115,8 +120,11 @@ class _SearchComponentState extends State<SearchComponent> {
       if (rowTitle.contains('-')) {
         rowTitle = rowTitle.substring(0, rowTitle.lastIndexOf('-'));
       }
-      threads.add(
-          Thread(title: rowTitle, url: row['unescapedUrl'], content: (row['contentNoFormatting'] as String).replaceAll('\n', '')));
+      threads.add(Thread(
+          title: rowTitle,
+          url: row['unescapedUrl'],
+          content:
+              (row['contentNoFormatting'] as String).replaceAll('\n', '')));
     }
     setState(() {
       this.start += threads.length;
@@ -140,7 +148,6 @@ class _SearchComponentState extends State<SearchComponent> {
     );
   }
 
-
   void _search(value) {
     setState(() {
       this.start = 0;
@@ -157,7 +164,10 @@ class _SearchComponentState extends State<SearchComponent> {
       builder: (context, snapshot) {
         if (snapshot.data == null) {
           return Container(
-            child: InkWell(child: Text('没有搜索记录'),),
+            padding: EdgeInsets.all(5),
+            child: InkWell(
+              child: Text('没有搜索记录'),
+            ),
           );
         }
         return Container(
@@ -165,23 +175,55 @@ class _SearchComponentState extends State<SearchComponent> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              InkWell(
-                child: Text('历史记录', style: Theme.of(context).textTheme.subhead,),
-              ),
-              Wrap(children: (snapshot.data as List<String>).reversed.map((v) {
-                return InkWell(
-                  onTap: () {
-                    if (_textController.text != v) {
-                      _textController.text = v;
-                      _search(v);
-                      FocusScope.of(context).unfocus();
-                    }
-                  },
-                  child: Chip(
-                    label: Text(v),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  InkWell(
+                    child: Text(
+                      '历史记录',
+                      style: Theme.of(context).textTheme.subhead,
+                    ),
                   ),
-                );
-              }).toList(),)
+                  GestureDetector(
+                    onLongPress: () {
+                      _clearSearchHis();
+                      setState(() {});
+                    },
+                    onTap: () {
+                      Scaffold.of(context).showSnackBar(SnackBar(
+                          content: Text('长按删除历史记录'),
+                          action: SnackBarAction(
+                            label: '了解',
+                            onPressed: () {
+                              // Some code to undo the change.
+                            },
+                          )));
+                    },
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.clear,
+                        size: 16.0,
+                      ),
+                    ),
+                  )
+                ],
+              ),
+              Wrap(
+                children: (snapshot.data as List<String>).reversed.map((v) {
+                  return InkWell(
+                    onTap: () {
+                      if (_textController.text != v) {
+                        _textController.text = v;
+                        _search(v);
+                        FocusScope.of(context).unfocus();
+                      }
+                    },
+                    child: Chip(
+                      label: Text(v),
+                    ),
+                  );
+                }).toList(),
+              )
             ],
           ),
         );
@@ -211,8 +253,8 @@ class _SearchComponentState extends State<SearchComponent> {
           onTap: () {
             print(threads[index].url);
             if (threads[index].url.contains('thread')) {
-              Navigator.of(context).pushNamed('thread',
-                  arguments: threads[index]);
+              Navigator.of(context)
+                  .pushNamed('thread', arguments: threads[index]);
             }
           },
         );
